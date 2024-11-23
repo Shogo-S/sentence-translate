@@ -1,12 +1,12 @@
-$railwayJson = @{
-    build = @{
-        builder = "NIXPACKS"
+@"
+{
+    "build": {
+        "builder": "NIXPACKS"
+    },
+    "deploy": {
+        "startCommand": "streamlit run app.py",
+        "restartPolicyType": "ON_FAILURE",
+        "restartPolicyMaxRetries": 10
     }
-    deploy = @{
-        startCommand = "streamlit run app.py"
-        restartPolicyType = "ON_FAILURE"
-        restartPolicyMaxRetries = 10
-    }
-} | ConvertTo-Json
-
-$railwayJson | Out-File -Encoding utf8 railway.json
+}
+"@ | Set-Content -Path railway.json -Encoding UTF8
