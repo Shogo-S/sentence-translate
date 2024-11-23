@@ -1,4 +1,3 @@
-@"
 {
     "build": {
         "builder": "NIXPACKS"
@@ -9,4 +8,3 @@
         "restartPolicyMaxRetries": 10
     }
 }
-"@ | Set-Content -Path railway.json -Encoding UTF8
