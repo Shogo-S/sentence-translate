@@ -24,6 +24,35 @@ st.title("英語文章の日本語翻訳アプリ")
 # 英語文章の入力
 english_text = st.text_area("英語の文章をここに貼り付けてください:", height=300)
 
+def split_sentences(text):
+    # テキストの前処理
+    # 改行を空白に置換
+    text = text.replace('\n', ' ')
+    # 複数の空白を1つの空白に置換
+    text = re.sub(r'\s+', ' ', text)
+    
+    # 文末のパターンを定義
+    # ピリオド、感嘆符、疑問符の後に空白または文字列の終わりが来る場合をマッチ
+    # ただし、Mr., Dr., etc. などの略語は除外
+    exceptions = r'(?<!Mr)(?<!Mrs)(?<!Dr)(?<!Prof)(?<!Sr)(?<!Jr)(?<!vs)(?<!etc)'
+    pattern = f'{exceptions}[.!?](?=\\s+[A-Z]|$)'
+    
+    # 文を分割
+    sentences = re.split(pattern, text)
+    
+    # 分割後の文章を整形
+    cleaned_sentences = []
+    for sentence in sentences:
+        # 文章の前後の空白を削除
+        sentence = sentence.strip()
+        if sentence:  # 空の文字列は除外
+            # 文末の句読点を追加（最後の文字が .!? でない場合）
+            if not sentence[-1] in '.!?':
+                sentence += '.'
+            cleaned_sentences.append(sentence)
+    
+    return cleaned_sentences
+
 # 送信ボタン
 if st.button("翻訳して表示"):
     if not english_text.strip():
@@ -31,8 +60,8 @@ if st.button("翻訳して表示"):
     else:
         with st.spinner('翻訳中...'):
             try:
-                # 英語を文ごとに分割
-                sentences = re.split(r'(?<=[.!?]) +', english_text.strip())
+                # 改良した文章分割を使用
+                sentences = split_sentences(english_text)
 
                 # 翻訳用プロンプトを作成
                 prompt = (
@@ -61,10 +90,6 @@ if st.button("翻訳して表示"):
                     temperature=0
                 )
 
-                # レスポンス全体を表示（デバッグ用）
-                # st.subheader("APIレスポンス (デバッグ用):")
-                # st.json(response.model_dump())
-
                 # レスポンスから翻訳結果を取得
                 translation_content = response.choices[0].message.content.strip()
 
@@ -76,10 +101,6 @@ if st.button("翻訳して表示"):
                     return content
 
                 translation_json = extract_json(translation_content)
-
-                # レスポンス内容を表示（デバッグ用）
-                # st.subheader("翻訳結果の生データ (デバッグ用):")
-                # st.text(translation_json)
 
                 # JSON形式であることを仮定してパース
                 try:
@@ -108,5 +129,5 @@ if st.button("翻訳して表示"):
 if 'japanese_sentences' in st.session_state:
     st.header("日本語訳:")
     for idx, jp_sentence in enumerate(st.session_state.japanese_sentences, 1):
-        with st.expander(f"{jp_sentence}"):
+        with st.expander(f"{idx}.{jp_sentence}"):
             st.write(st.session_state.english_sentences[idx-1])
