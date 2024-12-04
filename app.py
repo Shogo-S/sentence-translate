@@ -32,8 +32,6 @@ def split_sentences(text):
     text = re.sub(r'\s+', ' ', text)
     
     # 文末のパターンを定義
-    # ピリオド、感嘆符、疑問符の後に空白または文字列の終わりが来る場合をマッチ
-    # ただし、Mr., Dr., etc. などの略語は除外
     exceptions = r'(?<!Mr)(?<!Mrs)(?<!Dr)(?<!Prof)(?<!Sr)(?<!Jr)(?<!vs)(?<!etc)'
     pattern = f'{exceptions}[.!?](?=\\s+[A-Z]|$)'
     
@@ -43,10 +41,8 @@ def split_sentences(text):
     # 分割後の文章を整形
     cleaned_sentences = []
     for sentence in sentences:
-        # 文章の前後の空白を削除
         sentence = sentence.strip()
-        if sentence:  # 空の文字列は除外
-            # 文末の句読点を追加（最後の文字が .!? でない場合）
+        if sentence:
             if not sentence[-1] in '.!?':
                 sentence += '.'
             cleaned_sentences.append(sentence)
@@ -60,65 +56,26 @@ if st.button("翻訳して表示"):
     else:
         with st.spinner('翻訳中...'):
             try:
-                # 改良した文章分割を使用
                 sentences = split_sentences(english_text)
 
-                # 翻訳用プロンプトを作成
-                prompt = (
-                    "以下の英語の文章を1文ずつ日本語に翻訳してください。"
-                    "結果は以下の形式の完全なJSONオブジェクトで出力してください。\n\n"
-                    "{\n"
-                )
-                for i, sentence in enumerate(sentences, 1):
-                    # ダブルクォートをエスケープ
-                    escaped_sentence = sentence.replace('"', '\\"')
-                    prompt += f'  "文{i}": "{escaped_sentence}",\n'
-                # 最後のカンマを削除するために条件分岐
-                if prompt.endswith(",\n"):
-                    prompt = prompt.rstrip(",\n") + "\n"
-                prompt += "}\n\n"
-                prompt += "必ず完全なJSON形式で出力してください。"
+                # 各文を個別に翻訳
+                japanese_sentences = []
+                for sentence in sentences:
+                    response = client.chat.completions.create(
+                        model="gpt-3.5-turbo",
+                        messages=[
+                            {"role": "system", "content": "You are a translator that translates English to Japanese."},
+                            {"role": "user", "content": f"Translate this English sentence to Japanese: {sentence}"}
+                        ],
+                        max_tokens=1000,
+                        temperature=0
+                    )
+                    
+                    japanese_translation = response.choices[0].message.content.strip()
+                    japanese_sentences.append(japanese_translation)
 
-                # ChatCompletion APIを呼び出す
-                response = client.chat.completions.create(
-                    model="gpt-3.5-turbo",
-                    messages=[
-                        {"role": "system", "content": "You are a helpful assistant that translates English sentences to Japanese and formats the output as JSON."},
-                        {"role": "user", "content": prompt}
-                    ],
-                    max_tokens=2000,  # 必要に応じて調整
-                    temperature=0
-                )
-
-                # レスポンスから翻訳結果を取得
-                translation_content = response.choices[0].message.content.strip()
-
-                # コードブロックを取り除く関数
-                def extract_json(content):
-                    # ```jsonで始まり```で終わる場合は取り除く
-                    if content.startswith("```json") and content.endswith("```"):
-                        return content[len("```json"): -len("```")].strip()
-                    return content
-
-                translation_json = extract_json(translation_content)
-
-                # JSON形式であることを仮定してパース
-                try:
-                    translations = json.loads(translation_json)
-                except json.JSONDecodeError as e:
-                    st.error("翻訳結果のJSON解析に失敗しました。レスポンスの内容を確認してください。")
-                    st.text(f"エラー詳細: {str(e)}")
-                    st.text("翻訳結果の生データ:")
-                    st.text(translation_json)
-                    st.stop()
-
-                # 日本語の文章をリストに格納
-                japanese_sentences = list(translations.values())
-                english_sentences = sentences  # 元の英語文リストを使用
-
-                # セッションステートにデータを保存
                 st.session_state.japanese_sentences = japanese_sentences
-                st.session_state.english_sentences = english_sentences
+                st.session_state.english_sentences = sentences
 
                 st.success("翻訳が完了しました！")
 
@@ -128,6 +85,7 @@ if st.button("翻訳して表示"):
 # 翻訳結果の表示
 if 'japanese_sentences' in st.session_state:
     st.header("日本語訳:")
-    for idx, jp_sentence in enumerate(st.session_state.japanese_sentences, 1):
-        with st.expander(f"{idx}.{jp_sentence}"):
-            st.write(st.session_state.english_sentences[idx-1])
+    for idx, (jp_sentence, en_sentence) in enumerate(zip(st.session_state.japanese_sentences, st.session_state.english_sentences), 1):
+        with st.expander(f"{idx}. {jp_sentence}"):
+            st.write("英語原文:")
+            st.write(en_sentence)
